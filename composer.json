@@ -1,0 +1,46 @@
+{
+  "name": "laraxgram/armada",
+  "description": "Docker files for running a basic LaraGram Bot.",
+  "keywords": [
+    "laragram",
+    "docker",
+    "laravel"
+  ],
+  "license": "MIT",
+  "support": {
+    "issues": "https://github.com/laraxgram/armada/issues",
+    "source": "https://github.com/laraxgram/armada"
+  },
+  "authors": [
+    {
+      "name": "AmirHkrg",
+      "email": "amirh.kargar85@gmail.com"
+    }
+  ],
+  "require": {
+    "php": "^8.0",
+    "laraxgram/console": "^3",
+    "laraxgram/contracts": "^3",
+    "laraxgram/support": "^3"
+  },
+  "bin": [
+    "bin/armada"
+  ],
+  "autoload": {
+    "psr-4": {
+      "LaraGram\\Armada\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "LaraGram\\Armada\\ArmadaServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
