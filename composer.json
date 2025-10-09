@@ -32,7 +32,7 @@
     }
   },
   "extra": {
-    "laravel": {
+    "laragram": {
       "providers": [
         "LaraGram\\Armada\\ArmadaServiceProvider"
       ]
