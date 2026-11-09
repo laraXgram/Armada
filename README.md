@@ -1,3 +1,5 @@
+<p align="center"><img src="art/logo.svg" width="320" alt="LaraGram Armada"></p>
+
 # LaraGram Armada
 
 Armada provides a Docker environment for LaraGram that works on macOS, Windows (WSL2), and Linux, with PHP 8.3, 8.4, and 8.5. Apart from Docker, no additional software is required.
@@ -16,10 +18,6 @@ php laragram armada:install
 ## Official Documentation
 
 Documentation for Armada can be found on the [LaraGram website](https://laraxgram.github.io/v4/armada).
-
-## Inspiration
-
-LaraGram Armada is derived from [Laravel Sail](https://github.com/laravel/sail).
 
 ## License
 
