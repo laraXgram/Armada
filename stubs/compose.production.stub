@@ -1,0 +1,37 @@
+# For more information: https://laraxgram.github.io/v4/armada#production
+services:
+    app:
+        build:
+            context: .
+            dockerfile: docker/production/Dockerfile
+            args:
+                PHP_VERSION: '8.5'
+                INSTALL_NODE: '0'
+        image: '${ARMADA_IMAGE:-laragram-app}:${ARMADA_IMAGE_TAG:-latest}'
+        restart: unless-stopped
+        env_file:
+            - .env
+        environment:
+            APP_ENV: production
+            APP_DEBUG: 'false'
+            ARMADA_ROLE: web
+            ARMADA_SERVER: fpm
+            ARMADA_MIGRATE: '${ARMADA_MIGRATE:-0}'
+        ports:
+            - '${APP_PORT:-8000}:8000'
+        volumes:
+            - 'armada-storage:/var/www/html/storage'
+        networks:
+            - armada
+        healthcheck:
+            test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/8000"]
+            interval: 5s
+            retries: 12
+            timeout: 3s
+            start_period: 30s
+networks:
+    armada:
+        driver: bridge
+volumes:
+    armada-storage:
+        driver: local

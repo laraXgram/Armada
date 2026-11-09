@@ -1,0 +1,22 @@
+bot-api:
+    image: 'ghcr.io/laraxgram/telegram-bot-api:${ARMADA_BOT_API_TAG:-latest}'
+    build:
+        context: ./vendor/laraxgram/armada/runtimes/telegram-bot-api
+        dockerfile: Dockerfile
+    environment:
+        TELEGRAM_API_ID: '${API_ID:-}'
+        TELEGRAM_API_HASH: '${API_HASH:-}'
+        WWWUSER: '${WWWUSER}'
+        WWWGROUP: '${WWWGROUP}'
+        BOT_API_VERBOSITY: '${BOT_API_VERBOSITY:-1}'
+    ports:
+        - '127.0.0.1:${FORWARD_BOT_API_PORT:-8081}:8081'
+    volumes:
+        - 'armada-bot-api:/var/lib/bot-api'
+    networks:
+        - armada
+    healthcheck:
+        test: ["CMD", "nc", "-z", "127.0.0.1", "8081"]
+        interval: 5s
+        retries: 12
+        timeout: 3s

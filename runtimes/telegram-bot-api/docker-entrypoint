@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${TELEGRAM_API_ID:-}" ] || [ -z "${TELEGRAM_API_HASH:-}" ]; then
+    echo "The Bot API server needs API_ID and API_HASH. Create them at https://my.telegram.org and add them to your .env file." >&2
+    exit 1
+fi
+
+# The application reads downloaded files from this directory, so both containers must run as the same user...
+uid="${WWWUSER:-1000}"
+gid="${WWWGROUP:-1000}"
+
+mkdir -p /var/lib/bot-api /tmp/bot-api
+chown -R "$uid:$gid" /var/lib/bot-api /tmp/bot-api
+
+exec su-exec "$uid:$gid" telegram-bot-api \
+    --local \
+    --dir=/var/lib/bot-api \
+    --temp-dir=/tmp/bot-api \
+    --http-port=8081 \
+    --http-stat-port=8082 \
+    --verbosity="${BOT_API_VERBOSITY:-1}" \
+    "$@"

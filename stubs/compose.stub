@@ -1,19 +1,24 @@
-# For more information: https://laraxgram.github.io/armada.html
+# For more information: https://laraxgram.github.io/v4/armada
 services:
     laragram.test:
         build:
-            context: ./vendor/laraxgram/armada/runtimes/{{PHP_VERSION}}
+            context: ./vendor/laraxgram/armada/runtimes/app
             dockerfile: Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
-        image: armada-{{PHP_VERSION}}/app
+                PHP_VERSION: '8.5'
+        image: armada-8.5/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
             - '${APP_PORT:-80}:80'
+            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
         environment:
             WWWUSER: '${WWWUSER}'
             LARAGRAM_ARMADA: 1
+            ARMADA_SERVER: '${ARMADA_SERVER:-serve}'
+            ARMADA_UPDATES: '${ARMADA_UPDATES:-polling}'
+            ARMADA_PROCESSES: '${ARMADA_PROCESSES:-}'
             XDEBUG_MODE: '${ARMADA_XDEBUG_MODE:-off}'
             XDEBUG_CONFIG: '${ARMADA_XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'

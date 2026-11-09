@@ -2,11 +2,12 @@
 
 namespace LaraGram\Armada;
 
-use LaraGram\Contracts\Support\DeferrableProvider;
-use LaraGram\Support\ServiceProvider;
 use LaraGram\Armada\Console\AddCommand;
 use LaraGram\Armada\Console\InstallCommand;
+use LaraGram\Armada\Console\ProductionCommand;
 use LaraGram\Armada\Console\PublishCommand;
+use LaraGram\Contracts\Support\DeferrableProvider;
+use LaraGram\Support\ServiceProvider;
 
 class ArmadaServiceProvider extends ServiceProvider implements DeferrableProvider
 {
@@ -33,6 +34,7 @@ class ArmadaServiceProvider extends ServiceProvider implements DeferrableProvide
                 InstallCommand::class,
                 AddCommand::class,
                 PublishCommand::class,
+                ProductionCommand::class,
             ]);
         }
     }
@@ -46,16 +48,25 @@ class ArmadaServiceProvider extends ServiceProvider implements DeferrableProvide
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/../runtimes' => $this->app->basePath('docker'),
+                __DIR__.'/../runtimes/app' => $this->app->basePath('docker/app'),
+                __DIR__.'/../runtimes/telegram-bot-api' => $this->app->basePath('docker/telegram-bot-api'),
+                __DIR__.'/../runtimes/apiserver' => $this->app->basePath('docker/apiserver'),
             ], ['armada', 'armada-docker']);
 
             $this->publishes([
-                __DIR__ . '/../bin/armada' => $this->app->basePath('armada'),
+                __DIR__.'/../bin/armada' => $this->app->basePath('armada'),
             ], ['armada', 'armada-bin']);
 
             $this->publishes([
-                __DIR__ . '/../database' => $this->app->basePath('docker'),
+                __DIR__.'/../database' => $this->app->basePath('docker'),
             ], ['armada', 'armada-database']);
+
+            $this->publishes([
+                __DIR__.'/../runtimes/production' => $this->app->basePath('docker/production'),
+                __DIR__.'/../runtimes/telegram-bot-api' => $this->app->basePath('docker/telegram-bot-api'),
+                __DIR__.'/../runtimes/apiserver' => $this->app->basePath('docker/apiserver'),
+                __DIR__.'/../stubs/dockerignore.stub' => $this->app->basePath('.dockerignore'),
+            ], 'armada-production');
         }
     }
 
@@ -68,7 +79,9 @@ class ArmadaServiceProvider extends ServiceProvider implements DeferrableProvide
     {
         return [
             InstallCommand::class,
+            AddCommand::class,
             PublishCommand::class,
+            ProductionCommand::class,
         ];
     }
 }

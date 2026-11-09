@@ -2,14 +2,13 @@
 
 namespace LaraGram\Armada\Console;
 
-use LaraGram\Console\Command;
-use LaraGram\Armada\Console\Concerns\InteractsWithDockerComposeServices;
 use LaraGram\Console\Attribute\AsCommand;
+use LaraGram\Console\Command;
 
 #[AsCommand(name: 'armada:publish')]
 class PublishCommand extends Command
 {
-    use InteractsWithDockerComposeServices;
+    use Concerns\InteractsWithDockerComposeServices;
 
     /**
      * The name and signature of the console command.
@@ -28,32 +27,23 @@ class PublishCommand extends Command
     /**
      * Execute the console command.
      *
-     * @return void
+     * @return int
      */
     public function handle()
     {
         $this->call('vendor:publish', ['--tag' => 'armada-docker']);
         $this->call('vendor:publish', ['--tag' => 'armada-database']);
 
-        file_put_contents(
-            $this->composePath(),
-            str_replace(
-                [
-                    './vendor/laraxgram/armada/runtimes/8.4',
-                    './vendor/laraxgram/armada/runtimes/8.3',
-                    './vendor/laraxgram/armada/runtimes/8.2',
-                    './vendor/laraxgram/armada/database/mysql',
-                    './vendor/laraxgram/armada/database/pgsql'
-                ],
-                [
-                    './docker/8.4',
-                    './docker/8.3',
-                    './docker/8.2',
-                    './docker/mysql',
-                    './docker/pgsql'
-                ],
-                file_get_contents($this->composePath())
-            )
-        );
+        $composePath = $this->composePath();
+
+        if (file_exists($composePath)) {
+            file_put_contents($composePath, str_replace(
+                ['./vendor/laraxgram/armada/runtimes/', './vendor/laraxgram/armada/database/'],
+                ['./docker/', './docker/'],
+                file_get_contents($composePath)
+            ));
+        }
+
+        return self::SUCCESS;
     }
 }

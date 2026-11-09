@@ -2,14 +2,13 @@
 
 namespace LaraGram\Armada\Console;
 
-use LaraGram\Console\Command;
-use LaraGram\Armada\Console\Concerns\InteractsWithDockerComposeServices;
 use LaraGram\Console\Attribute\AsCommand;
+use LaraGram\Console\Command;
 
 #[AsCommand(name: 'armada:add')]
 class AddCommand extends Command
 {
-    use InteractsWithDockerComposeServices;
+    use Concerns\InteractsWithDockerComposeServices;
 
     /**
      * The name and signature of the console command.
@@ -17,43 +16,45 @@ class AddCommand extends Command
      * @var string
      */
     protected $signature = 'armada:add
-        {services? : The services that should be added}
-    ';
+                {services? : The services that should be added}
+                {--bot-api= : Add or switch the Bot API server (cloud, official or laragram)}
+                {--server= : Change the server that runs the application (serve or surge)}
+                {--updates= : Change how the bot receives updates (polling or webhook)}
+                {--processes= : The processes that should run next to the server}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Add a service to an existing Armada installation';
+    protected $description = 'Add services to an existing Armada installation';
 
     /**
      * Execute the console command.
      *
-     * @return int|null
+     * @return int
      */
     public function handle()
     {
-        if ($this->argument('services')) {
-            $services = $this->argument('services') == 'none' ? [] : explode(',', $this->argument('services'));
-        } elseif ($this->option('no-interaction')) {
-            $services = $this->defaultServices;
-        } else {
-            $services = $this->gatherServicesInteractively();
+        if (! $this->ensureEnvironmentFileExists()) {
+            return self::FAILURE;
         }
 
-        if ($invalidServices = array_diff($services, $this->services)) {
-            $this->components->error('Invalid services ['.implode(',', $invalidServices).'].');
-
-            return 1;
+        if (($selection = $this->gatherSelection($this->argument('services'), adding: true)) === null) {
+            return self::FAILURE;
         }
 
-        $this->buildDockerCompose($services);
-        $this->replaceEnvVariables($services);
-
-        $this->prepareInstallation($services);
+        $this->buildDockerCompose($selection);
+        $this->replaceEnvVariables($selection);
+        $this->prepareInstallation($selection);
 
         $this->output->writeln('');
-        $this->components->info('Additional Armada services installed successfully.');
+        $this->components->info('Armada has been updated. Run "armada up" to apply the changes.');
+
+        $this->displayNextSteps($selection);
+
+        $this->output->writeln('');
+
+        return self::SUCCESS;
     }
 }

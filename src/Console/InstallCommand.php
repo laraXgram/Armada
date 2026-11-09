@@ -2,8 +2,8 @@
 
 namespace LaraGram\Armada\Console;
 
-use LaraGram\Console\Command;
 use LaraGram\Console\Attribute\AsCommand;
+use LaraGram\Console\Command;
 
 #[AsCommand(name: 'armada:install')]
 class InstallCommand extends Command
@@ -17,8 +17,12 @@ class InstallCommand extends Command
      */
     protected $signature = 'armada:install
                 {--with= : The services that should be included in the installation}
+                {--bot-api= : The Bot API server to use (cloud, official or laragram)}
+                {--server= : The server that runs the application (serve or surge)}
+                {--updates= : How the bot receives updates (polling or webhook)}
+                {--processes= : The processes that should run next to the server}
                 {--devcontainer : Create a .devcontainer configuration directory}
-                {--php=8.4 : The PHP version that should be used}';
+                {--php=8.5 : The PHP version that should be used}';
 
     /**
      * The console command description.
@@ -30,46 +34,42 @@ class InstallCommand extends Command
     /**
      * Execute the console command.
      *
-     * @return int|null
+     * @return int
      */
     public function handle()
     {
-        if ($this->option('with')) {
-            $services = $this->option('with') == 'none' ? [] : explode(',', $this->option('with'));
-        } elseif ($this->option('no-interaction')) {
-            $services = $this->defaultServices;
-        } else {
-            $services = $this->gatherServicesInteractively();
+        if (! in_array($this->option('php'), $this->phpVersions, true)) {
+            $this->components->error('Invalid PHP version ['.$this->option('php').']. Supported versions: '.implode(', ', $this->phpVersions).'.');
+
+            return self::FAILURE;
         }
 
-        if ($invalidServices = array_diff($services, $this->services)) {
-            $this->components->error('Invalid services ['.implode(',', $invalidServices).'].');
-
-            return 1;
+        if (! $this->ensureEnvironmentFileExists()) {
+            return self::FAILURE;
         }
 
-        $this->buildDockerCompose($services);
-        $this->replaceEnvVariables($services);
+        if (($selection = $this->gatherSelection()) === null) {
+            return self::FAILURE;
+        }
+
+        $this->buildDockerCompose($selection);
+        $this->replaceEnvVariables($selection);
 
         if ($this->option('devcontainer')) {
             $this->installDevContainer();
         }
 
-        $this->prepareInstallation($services);
+        $this->prepareInstallation($selection);
 
         $this->output->writeln('');
         $this->components->info('Armada scaffolding installed successfully. You may run your Docker containers using Armada\'s "up" command.');
 
         $this->output->writeln('<fg=gray>➜</> <options=bold>./vendor/bin/armada up</>');
 
-        if (in_array('mysql', $services) ||
-            in_array('mariadb', $services) ||
-            in_array('pgsql', $services)) {
-            $this->components->warn('A database service was installed. Run "laragram migrate" to prepare your database:');
-
-            $this->output->writeln('<fg=gray>➜</> <options=bold>./vendor/bin/armada laragram migrate</>');
-        }
+        $this->displayNextSteps($selection);
 
         $this->output->writeln('');
+
+        return self::SUCCESS;
     }
 }

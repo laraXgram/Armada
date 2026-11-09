@@ -1,12 +1,24 @@
+<p align="center"><img src="art/logo.svg" width="320" alt="LaraGram Armada"></p>
+
 # LaraGram Armada
 
-Armada provides a Docker-powered local development environment for LaraGram that works on macOS, Windows (WSL2), and Linux.
-Apart from Docker, no additional software or libraries are required to run Armada.
-Its simple CLI lets you start building and managing your LaraGram bots immediately, even if you have no prior experience with Docker.
+Armada provides a Docker environment for LaraGram that works on macOS, Windows (WSL2), and Linux, with PHP 8.3, 8.4, and 8.5. Apart from Docker, no additional software is required.
 
-# Inspiration
-LaraGram Armada is inspired by and derived from [Laravel Sail](https://github.com/laravel/sail).
+- Run the official `telegram-bot-api` server or the LaraGram API Server next to your bot.
+- Run Surge, MTProto, Luna SSR, Sentinel, Watchdog, queues, and the scheduler with a single setting.
+- Generate production images and a Compose file for deployment.
 
-# Official Documentation
-Documentation for Armada can be found on the [LaraGram website](https://laraxgram.github.io/armada.html).
+```shell
+composer require laraxgram/armada --dev
 
+php laragram armada:install
+./vendor/bin/armada up
+```
+
+## Official Documentation
+
+Documentation for Armada can be found on the [LaraGram website](https://laraxgram.github.io/v4/armada).
+
+## License
+
+LaraGram Armada is open-sourced software licensed under the [MIT license](LICENSE).
