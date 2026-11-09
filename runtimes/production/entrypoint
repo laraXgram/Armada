@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -e
+
+laragram=(gosu armada php /var/www/html/laragram)
+
+# The storage directory is a volume, so its structure and owner must be restored on start...
+mkdir -p storage/app/public storage/framework/{cache/data,sessions,views,testing} storage/logs bootstrap/cache
+chown -R armada:armada storage bootstrap/cache
+
+# Run a one-off command instead of a role when the container is given one...
+if [ $# -gt 0 ]; then
+    exec gosu armada "$@"
+fi
+
+"${laragram[@]}" optimize
+
+case "$ARMADA_ROLE" in
+    web)
+        if [ "${ARMADA_MIGRATE:-0}" = "1" ]; then
+            "${laragram[@]}" migrate --force
+        fi
+
+        if [ "${ARMADA_SERVER:-fpm}" = "surge" ]; then
+            options=(--host=0.0.0.0 --port=8000)
+
+            if [ "${ARMADA_UPDATES:-webhook}" = "polling" ]; then
+                options+=(--polling)
+            fi
+
+            exec "${laragram[@]}" surge:start "${options[@]}"
+        fi
+
+        exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+        ;;
+    queue) exec "${laragram[@]}" queue:work --tries=3 --max-time=3600 ;;
+    sentinel-queue) exec "${laragram[@]}" sentinel:queue ;;
+    schedule) exec "${laragram[@]}" schedule:work ;;
+    poller) exec "${laragram[@]}" poll ;;
+    mtproto) exec "${laragram[@]}" client:start --all ;;
+    ssr) exec "${laragram[@]}" luna:start-ssr ;;
+    sentinel-check) exec "${laragram[@]}" sentinel:check ;;
+    *)
+        echo "Unknown ARMADA_ROLE [$ARMADA_ROLE]." >&2
+        exit 1
+        ;;
+esac

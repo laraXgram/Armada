@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+
+if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "armada" ]; then
+    echo "You should set SUPERVISOR_PHP_USER to either 'armada' or 'root'."
+    exit 1
+fi
+
+if [ -n "$WWWUSER" ]; then
+    usermod -u "$WWWUSER" armada
+fi
+
+if [ ! -d /.composer ]; then
+    mkdir /.composer
+fi
+
+chmod -R ugo+rw /.composer
+
+if [ -d /var/lib/bot-api ]; then
+    chown "${WWWUSER:-armada}" /var/lib/bot-api
+fi
+
+# Run a one-off command instead of the supervisor when the container is given one...
+if [ $# -gt 0 ]; then
+    if [ "$SUPERVISOR_PHP_USER" = "root" ]; then
+        exec "$@"
+    else
+        exec gosu "$WWWUSER" "$@"
+    fi
+fi
+
+laragram="/usr/bin/php -d variables_order=EGPCS /var/www/html/laragram"
+
+# Determine the command that serves the application, unless it has been customized...
+if [ -z "$SUPERVISOR_PHP_COMMAND" ]; then
+    case "${ARMADA_SERVER:-serve}" in
+        surge)
+            SUPERVISOR_PHP_COMMAND="$laragram surge:start --host=0.0.0.0 --port=80"
+
+            if [ -d /var/www/html/node_modules/chokidar ]; then
+                SUPERVISOR_PHP_COMMAND="$SUPERVISOR_PHP_COMMAND --watch"
+            fi
+            ;;
+        serve)
+            SUPERVISOR_PHP_COMMAND="$laragram serve --host=0.0.0.0 --port=80"
+            ;;
+        *)
+            echo "Unknown ARMADA_SERVER [${ARMADA_SERVER}]. You should use 'serve' or 'surge'."
+            exit 1
+            ;;
+    esac
+
+    if [ "${ARMADA_UPDATES:-polling}" = "polling" ]; then
+        SUPERVISOR_PHP_COMMAND="$SUPERVISOR_PHP_COMMAND --polling"
+    fi
+fi
+
+export SUPERVISOR_PHP_COMMAND
+
+# Get the command that starts the Vite development server with the project's package manager...
+function vite_command() {
+    local run="npm run dev --"
+
+    if [ -f /var/www/html/bun.lock ] || [ -f /var/www/html/bun.lockb ]; then
+        run="bun run dev"
+    elif [ -f /var/www/html/pnpm-lock.yaml ]; then
+        run="pnpm run dev"
+    elif [ -f /var/www/html/yarn.lock ]; then
+        run="yarn run dev"
+    fi
+
+    echo "$run --host 0.0.0.0 --port ${VITE_PORT:-5173}"
+}
+
+# Write a supervisor program for a process that runs next to the server...
+function add_process() {
+    cat > "/etc/supervisor/armada/$1.conf" <<EOF
+[program:$1]
+command=$2
+directory=/var/www/html
+user=$SUPERVISOR_PHP_USER
+environment=LARAGRAM_ARMADA="1",HOME="/home/armada"
+autorestart=unexpected
+startretries=3
+stopwaitsecs=40
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+EOF
+}
+
+mkdir -p /etc/supervisor/armada
+rm -f /etc/supervisor/armada/*.conf
+
+IFS=',' read -ra processes <<< "${ARMADA_PROCESSES:-}"
+
+for process in "${processes[@]}"; do
+    case "${process// /}" in
+        "") ;;
+        queue) add_process queue "$laragram queue:listen --tries=1 --timeout=0" ;;
+        schedule) add_process schedule "$laragram schedule:work" ;;
+        watchdog) add_process watchdog "$laragram watchdog --timeout=0" ;;
+        mtproto) add_process mtproto "$laragram client:start --all" ;;
+        ssr) add_process ssr "$laragram luna:start-ssr" ;;
+        sentinel-queue) add_process sentinel-queue "$laragram sentinel:queue" ;;
+        sentinel-check) add_process sentinel-check "$laragram sentinel:check" ;;
+        vite) add_process vite "$(vite_command)" ;;
+        *) echo "Skipping unknown Armada process [$process]." ;;
+    esac
+done
+
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

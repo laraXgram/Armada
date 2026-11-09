@@ -45,8 +45,16 @@ function display_help {
     echo "  ${GREEN}armada ps${NC}        Display the status of all containers"
     echo
     echo "${YELLOW}Commander Commands:${NC}"
-    echo "  ${GREEN}armada laragram ...${NC}          Run an Commander command"
+    echo "  ${GREEN}armada laragram ...${NC}          Run a Commander command"
     echo "  ${GREEN}armada laragram queue:work${NC}"
+    echo "  ${GREEN}armada probe${NC}                 Start a new Probe session"
+    echo "  ${GREEN}armada watchdog${NC}              Tail the application logs"
+    echo
+    echo "${YELLOW}Bot API Server:${NC}"
+    echo "  ${GREEN}armada bot-api status${NC}    Display the status of the Bot API server"
+    echo "  ${GREEN}armada bot-api logs${NC}      Follow the logs of the Bot API server"
+    echo "  ${GREEN}armada bot-api restart${NC}   Restart the Bot API server"
+    echo "  ${GREEN}armada bot-api logout${NC}    Log the bot out of the cloud Bot API"
     echo
     echo "${YELLOW}PHP Commands:${NC}"
     echo "  ${GREEN}armada php ...${NC}   Run a snippet of PHP code"
@@ -54,10 +62,17 @@ function display_help {
     echo
     echo "${YELLOW}Composer Commands:${NC}"
     echo "  ${GREEN}armada composer ...${NC}                       Run a Composer command"
-    echo "  ${GREEN}armada composer require laragram/surge${NC}"
+    echo "  ${GREEN}armada composer require laraxgram/surge${NC}"
     echo
-    echo "${YELLOW}NPM Commands:${NC}"
-    echo "  ${GREEN}armada npx${NC}            Run a npx command"
+    echo "${YELLOW}Node Commands:${NC}"
+    echo "  ${GREEN}armada node ...${NC}   Run a Node command"
+    echo "  ${GREEN}armada npm ...${NC}    Run a npm command"
+    echo "  ${GREEN}armada npx${NC}        Run a npx command"
+    echo "  ${GREEN}armada pnpm ...${NC}   Run a pnpm command"
+    echo "  ${GREEN}armada pnpx${NC}       Run a pnpx command"
+    echo "  ${GREEN}armada yarn ...${NC}   Run a Yarn command"
+    echo "  ${GREEN}armada bun ...${NC}    Run a bun command"
+    echo "  ${GREEN}armada bunx${NC}       Run a bunx command"
     echo
     echo "${YELLOW}Database Commands:${NC}"
     echo "  ${GREEN}armada mysql${NC}     Start a MySQL CLI session within the 'mysql' container"
@@ -68,7 +83,7 @@ function display_help {
     echo "  ${GREEN}armada valkey${NC}    Start a Valkey CLI session within the 'valkey' container"
     echo
     echo "${YELLOW}Debugging:${NC}"
-    echo "  ${GREEN}armada debug ...${NC}          Run an Commander command in debug mode"
+    echo "  ${GREEN}armada debug ...${NC}   Run a Commander command in debug mode"
     echo "  ${GREEN}armada debug queue:work${NC}"
     echo
     echo "${YELLOW}Container CLI:${NC}"
@@ -81,9 +96,13 @@ function display_help {
     echo "  ${GREEN}armada bin ...${NC}   Run Composer binary scripts from the vendor/bin directory"
     echo "  ${GREEN}armada run ...${NC}   Run a command within the application container"
     echo
+    echo "${YELLOW}Production:${NC}"
+    echo "  ${GREEN}armada prod ...${NC}   Run any Armada command against compose.production.yaml"
+    echo "  ${GREEN}armada prod up -d${NC}"
+    echo
     echo "${YELLOW}Customization:${NC}"
     echo "  ${GREEN}armada laragram armada:publish${NC}   Publish the Armada configuration files"
-    echo "  ${GREEN}armada build --no-cache${NC}       Rebuild all of the Armada containers"
+    echo "  ${GREEN}armada build --no-cache${NC}          Rebuild all of the Armada containers"
 
     exit 1
 }
@@ -100,9 +119,23 @@ fi
 # Source the ".env" file so LaraGram's environment variables are available...
 # shellcheck source=/dev/null
 if [ -n "$APP_ENV" ] && [ -f ./.env."$APP_ENV" ]; then
-  source ./.env."$APP_ENV";
+    source ./.env."$APP_ENV";
 elif [ -f ./.env ]; then
-  source ./.env;
+    source ./.env;
+fi
+
+# Target the production Compose file...
+PRODUCTION="no"
+
+if [ "$1" == "prod" ]; then
+    shift 1
+
+    [ $# -eq 0 ] && display_help
+
+    PRODUCTION="yes"
+    ARMADA_FILES="compose.production.yaml"
+    APP_SERVICE="app"
+    APP_USER="armada"
 fi
 
 # Define environment variables...
@@ -114,27 +147,22 @@ export WWWUSER=${WWWUSER:-$UID}
 export WWWGROUP=${WWWGROUP:-$(id -g)}
 
 export ARMADA_FILES=${ARMADA_FILES:-""}
-export ARMADA_SHARE_DASHBOARD=${ARMADA_SHARE_DASHBOARD:-4040}
-export ARMADA_SHARE_SERVER_HOST=${ARMADA_SHARE_SERVER_HOST:-"laragram-armada.site"}
-export ARMADA_SHARE_SERVER_PORT=${ARMADA_SHARE_SERVER_PORT:-8080}
-export ARMADA_SHARE_SUBDOMAIN=${ARMADA_SHARE_SUBDOMAIN:-""}
-export ARMADA_SHARE_DOMAIN=${ARMADA_SHARE_DOMAIN:-"$ARMADA_SHARE_SERVER_HOST"}
-export ARMADA_SHARE_SERVER=${ARMADA_SHARE_SERVER:-""}
+export ARMADA_DOCKER_BINARY=${ARMADA_DOCKER_BINARY:-"docker"}
 
 # Function that outputs Armada is not running...
 function armada_is_not_running {
     echo "${BOLD}Armada is not running.${NC}" >&2
     echo "" >&2
-    echo "${BOLD}You may Armada using the following commands:${NC} './vendor/bin/armada up' or './vendor/bin/armada up -d'" >&2
+    echo "${BOLD}You may start Armada using the following commands:${NC} './vendor/bin/armada up' or './vendor/bin/armada up -d'" >&2
 
     exit 1
 }
 
 # Define Docker Compose command prefix...
-if docker compose &> /dev/null; then
-    DOCKER_COMPOSE=(docker compose)
+if ${ARMADA_DOCKER_BINARY} compose &> /dev/null; then
+    COMPOSE_CMD=("${ARMADA_DOCKER_BINARY}" compose)
 else
-    DOCKER_COMPOSE=(docker-compose)
+    COMPOSE_CMD=("${ARMADA_DOCKER_BINARY}-compose")
 fi
 
 if [ -n "$ARMADA_FILES" ]; then
@@ -143,7 +171,7 @@ if [ -n "$ARMADA_FILES" ]; then
 
     for FILE in "${ARMADA_FILES[@]}"; do
         if [ -f "$FILE" ]; then
-            DOCKER_COMPOSE+=(-f "$FILE")
+            COMPOSE_CMD+=(-f "$FILE")
         else
             echo "${BOLD}Unable to find Docker Compose file: '${FILE}'${NC}" >&2
 
@@ -156,224 +184,217 @@ EXEC="yes"
 
 if [ -z "$ARMADA_SKIP_CHECKS" ]; then
     # Ensure that Docker is running...
-    if ! docker info > /dev/null 2>&1; then
-        echo "${BOLD}Docker is not running.${NC}" >&2
+    if ! ${ARMADA_DOCKER_BINARY} info > /dev/null 2>&1; then
+        echo "${BOLD}Docker or Podman is not running.${NC}" >&2
 
         exit 1
     fi
 
     # Determine if Armada is currently up...
-    if "${DOCKER_COMPOSE[@]}" ps "$APP_SERVICE" 2>&1 | grep 'Exit\|exited'; then
+    if [ "$PRODUCTION" == "no" ] && "${COMPOSE_CMD[@]}" ps "$APP_SERVICE" 2>&1 | grep 'Exit\|exited'; then
         echo "${BOLD}Shutting down old Armada processes...${NC}" >&2
 
-        "${DOCKER_COMPOSE[@]}" down > /dev/null 2>&1
+        "${COMPOSE_CMD[@]}" down > /dev/null 2>&1
 
         EXEC="no"
-    elif [ -z "$("${DOCKER_COMPOSE[@]}" ps -q)" ]; then
+    elif [ -z "$("${COMPOSE_CMD[@]}" ps -q)" ]; then
         EXEC="no"
     fi
 fi
 
 ARGS=()
 
-# Proxy PHP commands to the "php" binary on the application container...
-if [ "$1" == "php" ]; then
-    shift 1
+# Run a command inside of a running container...
+function exec_in {
+    [ "$EXEC" == "yes" ] || armada_is_not_running
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" "php")
-    else
-        armada_is_not_running
+    ARGS+=(exec)
+    [ ! -t 0 ] && ARGS+=(-T)
+    ARGS+=("$@")
+}
+
+# Run a command inside of the application container...
+function exec_in_app {
+    [ "$EXEC" == "yes" ] || armada_is_not_running
+
+    ARGS+=(exec -u "$APP_USER")
+    [ ! -t 0 ] && ARGS+=(-T)
+    ARGS+=("$APP_SERVICE" "$@")
+}
+
+# Log the bot out of the cloud Bot API so it can be used with a local server...
+function bot_api_logout {
+    if [ -z "$BOT_TOKEN" ]; then
+        echo "${BOLD}BOT_TOKEN is not set in your .env file.${NC}" >&2
+
+        exit 1
     fi
 
-# Proxy vendor binary commands on the application container...
-elif [ "$1" == "bin" ]; then
-    shift 1
+    if [ "$1" != "--force" ]; then
+        echo "This logs the bot out of api.telegram.org. It cannot log back in there for 10 minutes."
+        read -r -p "Do you want to continue? [y/N] " CONFIRM
 
-    if [ "$EXEC" == "yes" ]; then
+        if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
+            exit 0
+        fi
+    fi
+
+    # The token is passed through stdin to keep it out of the process list...
+    printf 'url = "https://api.telegram.org/bot%s/logOut"\n' "$BOT_TOKEN" | curl -sS --config -
+    echo
+}
+
+case "$1" in
+    # Proxy PHP commands to the "php" binary on the application container...
+    php)
+        shift 1
+        exec_in_app php
+        ;;
+
+    # Proxy vendor binary commands on the application container...
+    bin)
+        shift 1
         CMD=$1
         shift 1
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" ./vendor/bin/"$CMD")
-    else
-        armada_is_not_running
-    fi
+        exec_in_app ./vendor/bin/"$CMD"
+        ;;
 
-# Proxy commands on the application container...
-elif [ "$1" == "run" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
+    # Proxy commands on the application container...
+    run)
+        shift 1
         CMD=$1
         shift 1
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" "$CMD")
-    else
-        armada_is_not_running
-    fi
+        exec_in_app "$CMD"
+        ;;
 
-# Proxy docker-compose commands to the docker-compose binary on the application container...
-elif [ "$1" == "docker-compose" ]; then
-    shift 1
+    # Proxy Composer commands to the "composer" binary on the application container...
+    composer)
+        shift 1
+        exec_in_app composer
+        ;;
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" "${DOCKER_COMPOSE[@]}")
-    else
-        armada_is_not_running
-    fi
+    # Proxy Commander commands to the "laragram" binary on the application container...
+    laragram|lg)
+        shift 1
 
-# Proxy Composer commands to the "composer" binary on the application container...
-elif [ "$1" == "composer" ]; then
-    shift 1
+        if [ "$1" == "schedule:run" ]; then
+            ARGS+=(-T)
+        fi
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" "composer")
-    else
-        armada_is_not_running
-    fi
+        exec_in_app php laragram
+        ;;
 
-# Proxy Commander commands to the "laragram" binary on the application container...
-elif [ "$1" == "laragram" ] || [ "$1" == "lara" ] || [ "$1" == "l" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" php laragram)
-    else
-        armada_is_not_running
-    fi
-
-# Proxy the "debug" command to the "php laragram" binary on the application container with xdebug enabled...
-elif [ "$1" == "debug" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
+    # Run a Commander command with Xdebug enabled...
+    debug)
+        shift 1
+        [ "$EXEC" == "yes" ] || armada_is_not_running
         ARGS+=(exec -u "$APP_USER" -e XDEBUG_TRIGGER=1)
         [ ! -t 0 ] && ARGS+=(-T)
         ARGS+=("$APP_SERVICE" php laragram)
-    else
-        armada_is_not_running
-    fi
+        ;;
 
-# Proxy NPX commands to the "npx" binary on the application container...
-elif [ "$1" == "npx" ]; then
-    shift 1
+    # Initiate a Probe session within the application container...
+    probe)
+        shift 1
+        exec_in_app php laragram probe
+        ;;
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" npx)
-    else
-        armada_is_not_running
-    fi
+    # Tail the application logs...
+    watchdog)
+        shift 1
+        exec_in_app php laragram watchdog
+        ;;
 
-# Initiate a MySQL CLI terminal session within the "mysql" container...
-elif [ "$1" == "mysql" ]; then
-    shift 1
+    # Manage the Bot API server container...
+    bot-api)
+        shift 1
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec)
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(mysql bash -c)
-        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE} \${MYSQL_EXTRA_OPTIONS}")
-    else
-        armada_is_not_running
-    fi
+        case "${1:-status}" in
+            status)
+                "${COMPOSE_CMD[@]}" ps bot-api
+                ;;
+            logs)
+                "${COMPOSE_CMD[@]}" logs -f bot-api
+                ;;
+            restart)
+                "${COMPOSE_CMD[@]}" restart bot-api
+                ;;
+            logout)
+                bot_api_logout "$2"
+                ;;
+            *)
+                echo "Unknown bot-api command [$1]. Available commands: status, logs, restart, logout." >&2
 
-# Initiate a MySQL CLI terminal session within the "mariadb" container...
-elif [ "$1" == "mariadb" ]; then
-    shift 1
+                exit 1
+                ;;
+        esac
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec)
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(mariadb bash -c)
-        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mariadb -u \${MYSQL_USER} \${MYSQL_DATABASE}")
-    else
-        armada_is_not_running
-    fi
+        exit
+        ;;
 
-# Initiate a PostgreSQL CLI terminal session within the "pgsql" container...
-elif [ "$1" == "psql" ]; then
-    shift 1
+    # Proxy Node, NPM, PNPM, Yarn and Bun commands to the application container...
+    node|npm|npx|pnpm|pnpx|yarn|bun|bunx)
+        CMD=$1
+        shift 1
+        exec_in_app "$CMD"
+        ;;
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec)
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(pgsql bash -c)
-        ARGS+=("PGPASSWORD=\${PGPASSWORD} psql -U \${POSTGRES_USER} \${POSTGRES_DB}")
-    else
-        armada_is_not_running
-    fi
+    # Initiate a MySQL CLI terminal session within the "mysql" container...
+    mysql)
+        shift 1
+        exec_in mysql bash -c "MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE} \${MYSQL_EXTRA_OPTIONS}"
+        ;;
 
-# Initiate a Bash shell within the application container...
-elif [ "$1" == "shell" ] || [ "$1" == "bash" ]; then
-    shift 1
+    # Initiate a MySQL CLI terminal session within the "mariadb" container...
+    mariadb)
+        shift 1
+        exec_in mariadb bash -c "MYSQL_PWD=\${MYSQL_PASSWORD} mariadb -u \${MYSQL_USER} \${MYSQL_DATABASE}"
+        ;;
 
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$APP_USER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" bash)
-    else
-        armada_is_not_running
-    fi
+    # Initiate a PostgreSQL CLI terminal session within the "pgsql" container...
+    psql)
+        shift 1
+        exec_in pgsql bash -c "PGPASSWORD=\${PGPASSWORD} psql -U \${POSTGRES_USER} \${POSTGRES_DB}"
+        ;;
 
-# Initiate a root user Bash shell within the application container...
-elif [ "$1" == "root-shell" ] || [ "$1" == "root-bash" ]; then
-    shift 1
+    # Initiate a MongoDB Shell within the "mongodb" container...
+    mongodb)
+        shift 1
+        exec_in mongodb mongosh --port 27017 --username "$MONGODB_USERNAME" --password "$MONGODB_PASSWORD" --authenticationDatabase admin
+        ;;
 
-    if [ "$EXEC" == "yes" ]; then
+    # Initiate a Redis CLI terminal session within the "redis" container...
+    redis)
+        shift 1
+        exec_in redis redis-cli
+        ;;
+
+    # Initiate a Valkey CLI terminal session within the "valkey" container...
+    valkey)
+        shift 1
+        exec_in valkey valkey-cli
+        ;;
+
+    # Initiate a Bash shell within the application container...
+    shell|bash)
+        shift 1
+        exec_in_app bash
+        ;;
+
+    # Initiate a root user Bash shell within the application container...
+    root-shell|root-bash)
+        shift 1
+        [ "$EXEC" == "yes" ] || armada_is_not_running
         ARGS+=(exec -u root)
         [ ! -t 0 ] && ARGS+=(-T)
         ARGS+=("$APP_SERVICE" bash)
-    else
-        armada_is_not_running
-    fi
+        ;;
+esac
 
-# Initiate a MongoDB Shell within the "mongodb" container...
-elif [ "$1" == "mongodb" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec)
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(mongodb mongosh --port "${FORWARD_MONGODB_PORT:-27017}" --username "$MONGODB_USERNAME" --password "$MONGODB_PASSWORD" --authenticationDatabase admin)
-    else
-        armada_is_not_running
-    fi
-
-# Initiate a Redis CLI terminal session within the "redis" container...
-elif [ "$1" == "redis" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec)
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(redis redis-cli)
-    else
-        armada_is_not_running
-    fi
-
-# Initiate a Valkey CLI terminal session within the "valkey" container...
-elif [ "$1" == "valkey" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec)
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(valkey valkey-cli)
-    else
-        armada_is_not_running
-    fi
+# Forward the host terminal's color capability to container commands...
+if [ "${ARGS[0]:-}" == "exec" ] && [ -n "${COLORTERM:-}" ]; then
+    ARGS=(exec -e "COLORTERM=${COLORTERM}" "${ARGS[@]:1}")
+fi
 
 # Run Docker Compose with the defined arguments...
-"${DOCKER_COMPOSE[@]}" "${ARGS[@]}" "$@"
+"${COMPOSE_CMD[@]}" "${ARGS[@]}" "$@"
