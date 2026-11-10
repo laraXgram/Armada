@@ -9,6 +9,9 @@ bot-api:
         WWWUSER: '${WWWUSER}'
         WWWGROUP: '${WWWGROUP}'
         BOT_API_VERBOSITY: '${BOT_API_VERBOSITY:-1}'
+        API_STREAM_FILES: '${API_STREAM_FILES:-false}'
+        API_STREAM_READ_AHEAD: '${API_STREAM_READ_AHEAD:-4}'
+        API_FILE_STORAGE: '${API_FILE_STORAGE:-true}'
     ports:
         - '127.0.0.1:${FORWARD_BOT_API_PORT:-8081}:8081'
     volumes:

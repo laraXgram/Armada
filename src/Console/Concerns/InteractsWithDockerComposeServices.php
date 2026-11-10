@@ -44,6 +44,7 @@ trait InteractsWithDockerComposeServices
         'redis',
         'valkey',
         'memcached',
+        'docker-proxy',
     ];
 
     /**
@@ -466,6 +467,11 @@ trait InteractsWithDockerComposeServices
 
         if (in_array('redis', $services)) {
             $environment = str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=redis', $environment);
+        }
+
+        // Sentinel's Armada page reaches the Docker daemon through the socket proxy...
+        if (in_array('docker-proxy', $services)) {
+            $environment = $this->withEnvironmentValue($environment, 'SENTINEL_DOCKER_HOST', 'tcp://docker-proxy:2375');
         }
 
         if (in_array('valkey', $services)) {
