@@ -33,9 +33,9 @@ RUN apt-get update \
         php${PHP_VERSION}-msgpack \
         php${PHP_VERSION}-igbinary \
         php${PHP_VERSION}-redis \
-        php${PHP_VERSION}-swoole \
         php${PHP_VERSION}-memcached \
         php${PHP_VERSION}-imagick \
+    && { ! apt-cache show php${PHP_VERSION}-swoole > /dev/null 2>&1 || apt-get install -y php${PHP_VERSION}-swoole; } \
     && curl -sLS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/ --filename=composer \
     && apt-get -y autoremove \
     && apt-get clean \

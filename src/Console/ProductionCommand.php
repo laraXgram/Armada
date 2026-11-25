@@ -85,6 +85,10 @@ class ProductionCommand extends Command
             return self::FAILURE;
         }
 
+        if (! $this->serverSupportsPhpVersion($server, $this->option('php'))) {
+            return self::FAILURE;
+        }
+
         if (! in_array($updates, ['webhook', 'polling'], true)) {
             $this->components->error("Invalid update method [{$updates}].");
 

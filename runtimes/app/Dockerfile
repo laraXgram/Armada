@@ -49,10 +49,10 @@ RUN apt-get update && apt-get upgrade -y \
         php${PHP_VERSION}-msgpack \
         php${PHP_VERSION}-igbinary \
         php${PHP_VERSION}-redis \
-        php${PHP_VERSION}-swoole \
         php${PHP_VERSION}-memcached \
         php${PHP_VERSION}-imagick \
         php${PHP_VERSION}-xdebug \
+    && { ! apt-cache show php${PHP_VERSION}-swoole > /dev/null 2>&1 || apt-get install -y php${PHP_VERSION}-swoole; } \
     && curl -sLS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/ --filename=composer \
     && curl -fsSL https://deb.nodesource.com/setup_$NODE_VERSION.x | bash - \
     && apt-get install -y nodejs \

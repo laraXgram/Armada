@@ -29,7 +29,14 @@ trait InteractsWithDockerComposeServices
      *
      * @var array<string>
      */
-    protected $phpVersions = ['8.3', '8.4', '8.5'];
+    protected $phpVersions = ['8.3', '8.4', '8.5', '8.6'];
+
+    /**
+     * The PHP versions Swoole has no release for yet, so Surge can't run on them.
+     *
+     * @var array<int, string>
+     */
+    protected $phpVersionsWithoutSwoole = ['8.6'];
 
     /**
      * The available services that may be installed.
@@ -157,6 +164,10 @@ trait InteractsWithDockerComposeServices
             return null;
         }
 
+        if ($server !== null && ! $this->serverSupportsPhpVersion($server, $this->selectedPhpVersion())) {
+            return null;
+        }
+
         if ($updates !== null && ! in_array($updates, ['polling', 'webhook'], true)) {
             $this->components->error("Invalid update method [{$updates}]. Use polling or webhook.");
 
@@ -220,6 +231,60 @@ trait InteractsWithDockerComposeServices
             ],
             default: 'cloud',
         );
+    }
+
+    /**
+     * Determine if the server can run on the given PHP version, reporting why when it can't.
+     *
+     * @param  string  $server
+     * @param  string|null  $php
+     * @return bool
+     */
+    protected function serverSupportsPhpVersion($server, $php)
+    {
+        if ($server !== 'surge' || ! in_array($php, $this->phpVersionsWithoutSwoole, true) || $this->surgeDriver() !== 'swoole') {
+            return true;
+        }
+
+        $this->components->error("Surge runs on Swoole, which doesn't support PHP {$php} yet. Use --php=8.5, another --server, or the roadrunner or frankenphp Surge server.");
+
+        return false;
+    }
+
+    /**
+     * Get the server Surge runs on (SURGE_SERVER), which defaults to Swoole.
+     *
+     * @return string
+     */
+    protected function surgeDriver()
+    {
+        $path = $this->laragram->basePath('.env');
+
+        $driver = file_exists($path) ? $this->environmentValue(file_get_contents($path), 'SURGE_SERVER') : null;
+
+        return $driver ?: 'swoole';
+    }
+
+    /**
+     * Get the PHP version the application image is built with.
+     *
+     * @return string|null
+     */
+    protected function selectedPhpVersion()
+    {
+        if ($this->hasOption('php')) {
+            return $this->option('php');
+        }
+
+        $composePath = $this->composePath();
+
+        if (! file_exists($composePath)) {
+            return null;
+        }
+
+        $version = Yaml::parseFile($composePath)['services'][$this->appService]['build']['args']['PHP_VERSION'] ?? null;
+
+        return $version === null ? null : (string) $version;
     }
 
     /**
